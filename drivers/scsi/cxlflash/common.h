@@ -20,6 +20,12 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_device.h>
 
+#define CXLBDEV	1	
+#define ADD_CXLBDEV	1
+
+#ifdef CXLBDEV
+#include "cxlbdev.h"
+#endif
 
 #define MAX_CONTEXT  CXLFLASH_MAX_CONTEXT       /* num contexts per afu */
 
@@ -73,7 +79,13 @@ enum cxlflash_init_state {
 	INIT_STATE_NONE,
 	INIT_STATE_PCI,
 	INIT_STATE_AFU,
-	INIT_STATE_SCSI
+	INIT_STATE_SCSI,
+#ifdef CXLBDEV
+	INIT_STATE_CXLBDEV_ALLOC,
+	INIT_STATE_CXLBDEV_CTX,
+	INIT_STATE_CXLBDEV_AFU,
+	INIT_STATE_CXLBDEV_BDEV
+#endif
 };
 
 enum cxlflash_state {
@@ -90,6 +102,10 @@ enum cxlflash_state {
 struct cxlflash_cfg {
 	struct afu *afu;
 	struct cxl_context *mcctx;
+
+#ifdef CXLBDEV
+	struct cxlbdev_cfg	*cxlbdev_cfg;
+#endif
 
 	struct pci_dev *dev;
 	struct pci_device_id *dev_id;

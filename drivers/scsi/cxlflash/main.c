@@ -34,6 +34,11 @@ MODULE_AUTHOR("Manoj N. Kumar <manoj@linux.vnet.ibm.com>");
 MODULE_AUTHOR("Matthew R. Ochs <mrochs@linux.vnet.ibm.com>");
 MODULE_LICENSE("GPL");
 
+extern void cxlbdev_remove_bdevs(struct cxlbdev_cfg *);
+extern void cxlbdev_stop_afu_per_cpu(struct cxlbdev_cfg *);
+extern void cxlbdev_term_ctx_per_cpu(struct cxlbdev_cfg *);
+extern void cxlbdev_free_mem(struct cxlflash_cfg *);
+extern int cxlbdev_init(struct cxlflash_cfg *);
 
 /**
  * cxlflash_cmd_checkout() - checks out an AFU command
@@ -895,6 +900,16 @@ static void cxlflash_remove(struct pci_dev *pdev)
 	cxlflash_stop_term_user_contexts(cfg);
 
 	switch (cfg->init_state) {
+#ifdef CXLBDEV
+	case INIT_STATE_CXLBDEV_BDEV:
+		cxlbdev_remove_bdevs(cfg->cxlbdev_cfg);
+	case INIT_STATE_CXLBDEV_AFU:
+		cxlbdev_stop_afu_per_cpu(cfg->cxlbdev_cfg);
+	case INIT_STATE_CXLBDEV_CTX:
+		cxlbdev_term_ctx_per_cpu(cfg->cxlbdev_cfg);
+	case INIT_STATE_CXLBDEV_ALLOC:
+		cxlbdev_free_mem(cfg);
+#endif
 	case INIT_STATE_SCSI:
 		cxlflash_term_local_luns(cfg);
 		scsi_remove_host(cfg->host);
@@ -2286,7 +2301,6 @@ static int cxlflash_probe(struct pci_dev *pdev,
 		rc = -ENOMEM;
 		goto out;
 	}
-
 	cfg->init_state = INIT_STATE_NONE;
 	cfg->dev = pdev;
 
@@ -2354,6 +2368,14 @@ static int cxlflash_probe(struct pci_dev *pdev,
 		goto out_remove;
 	}
 	cfg->init_state = INIT_STATE_SCSI;
+
+#ifdef ADD_CXLBDEV
+	rc = cxlbdev_init(cfg);
+	if(rc) {
+		dev_err(&pdev->dev, "%s: call to cxlbdev_init failed rc=%d\n", __func__, rc);
+		goto out_remove;
+	}
+#endif
 
 out:
 	pr_debug("%s: returning rc=%d\n", __func__, rc);
