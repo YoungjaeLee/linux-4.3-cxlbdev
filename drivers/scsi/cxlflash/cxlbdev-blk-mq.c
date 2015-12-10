@@ -17,6 +17,34 @@ extern int cxlflash_send_cmd(struct afu *, struct afu_cmd *);
 extern struct cxlbdev_afu_cmd* cxlbdev_afu_cmd_checkout(struct cxlbdev_afu *);
 extern void cxlbdev_afu_cmd_checkin(struct cxlbdev_afu_cmd *);
 
+void cxlbdev_unblock_requests(struct cxlflash_cfg *cfg){
+	struct cxlbdev_cfg *cxlbdev_cfg = cfg->cxlbdev_cfg;
+	struct list_head *pos;
+	struct cxlbdev *cxlbdev;
+	int cfg_idx = cxlbdev_cfg->cfg_idx;
+
+	if(cfg->init_state != INIT_STATE_CXLBDEV_BDEV) return;
+
+	list_for_each(pos, &cxlbdev_cfg->cxlbdev_list_head){
+		cxlbdev = list_entry(pos, struct cxlbdev, list[cfg_idx]);
+		blk_mq_start_stopped_hw_queues(cxlbdev->request_queue, false);	
+	}
+}
+
+void cxlbdev_block_requests(struct cxlflash_cfg *cfg){
+	struct cxlbdev_cfg *cxlbdev_cfg = cfg->cxlbdev_cfg;
+	struct list_head *pos;
+	struct cxlbdev *cxlbdev;
+	int cfg_idx = cxlbdev_cfg->cfg_idx;
+
+	if(cfg->init_state != INIT_STATE_CXLBDEV_BDEV) return;
+
+	list_for_each(pos, &cxlbdev_cfg->cxlbdev_list_head){
+		cxlbdev = list_entry(pos, struct cxlbdev, list[cfg_idx]);
+		blk_mq_stop_hw_queues(cxlbdev->request_queue);	
+	}
+}
+
 static void cxlbdev_cmd_end(struct cxlbdev_cmd *cxlbdev_cmd, int error){
 	struct request *req = cxlbdev_cmd->req;
 

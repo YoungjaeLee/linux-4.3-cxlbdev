@@ -34,6 +34,11 @@ MODULE_AUTHOR("Manoj N. Kumar <manoj@linux.vnet.ibm.com>");
 MODULE_AUTHOR("Matthew R. Ochs <mrochs@linux.vnet.ibm.com>");
 MODULE_LICENSE("GPL");
 
+extern int cxlbdev_afu_reset(struct cxlflash_cfg *);
+extern int cxlbdev_pci_slot_reset(struct cxlflash_cfg *);
+extern void cxlbdev_remove(struct cxlflash_cfg *);
+extern void cxlbdev_block_requests(struct cxlflash_cfg*);
+extern void cxlbdev_unblock_requests(struct cxlflash_cfg*);
 extern void cxlbdev_remove_bdevs(struct cxlbdev_cfg *);
 extern void cxlbdev_stop_afu_per_cpu(struct cxlbdev_cfg *);
 extern void cxlbdev_term_ctx_per_cpu(struct cxlbdev_cfg *);
@@ -525,16 +530,30 @@ static int cxlflash_eh_host_reset_handler(struct scsi_cmnd *scp)
 	switch (cfg->state) {
 	case STATE_NORMAL:
 		cfg->state = STATE_LIMBO;
+#ifdef CXLBDEV
+		cxlbdev_block_requests(cfg);
+#endif
 		scsi_block_requests(cfg->host);
 		cxlflash_mark_contexts_error(cfg);
 		rcr = cxlflash_afu_reset(cfg);
 		if (rcr) {
+#ifdef CXLBDEV
+			cxlbdev_remove(cfg);
+#endif
 			rc = FAILED;
 			cfg->state = STATE_FAILTERM;
-		} else
+		} else {
+#ifdef CXLBDEV
+			if(cxlbdev_afu_reset(cfg))
+				pr_err("%s: cxlbdev_afu_reset failed\n", __func__);
+#endif
 			cfg->state = STATE_NORMAL;
+		}
 		wake_up_all(&cfg->limbo_waitq);
 		scsi_unblock_requests(cfg->host);
+#ifdef CXLBDEV
+		cxlbdev_unblock_requests(cfg);
+#endif
 		break;
 	case STATE_LIMBO:
 		wait_event(cfg->limbo_waitq, cfg->state != STATE_LIMBO);
@@ -2405,6 +2424,11 @@ static pci_ers_result_t cxlflash_pci_error_detected(struct pci_dev *pdev,
 	switch (state) {
 	case pci_channel_io_frozen:
 		cfg->state = STATE_LIMBO;
+#ifdef CXLBDEV
+		cxlbdev_block_requests(cfg);
+		cxlbdev_stop_afu_per_cpu(cfg->cxlbdev_cfg);
+		cxlbdev_term_ctx_per_cpu(cfg->cxlbdev_cfg);
+#endif
 
 		/* Turn off legacy I/O */
 		scsi_block_requests(cfg->host);
@@ -2420,6 +2444,9 @@ static pci_ers_result_t cxlflash_pci_error_detected(struct pci_dev *pdev,
 		cfg->state = STATE_FAILTERM;
 		wake_up_all(&cfg->limbo_waitq);
 		scsi_unblock_requests(cfg->host);
+#ifdef CXLBDEV
+		cxlbdev_unblock_requests(cfg);
+#endif
 		return PCI_ERS_RESULT_DISCONNECT;
 	default:
 		break;
@@ -2449,6 +2476,11 @@ static pci_ers_result_t cxlflash_pci_slot_reset(struct pci_dev *pdev)
 		dev_err(dev, "%s: EEH recovery failed! (%d)\n", __func__, rc);
 		return PCI_ERS_RESULT_DISCONNECT;
 	}
+#ifdef CXLBDEV
+	if(cxlbdev_pci_slot_reset(cfg)){
+		dev_err(dev, "%s: cxlbdev_pci_slot_reset failed\n", __func__);
+	}
+#endif
 
 	return PCI_ERS_RESULT_RECOVERED;
 }

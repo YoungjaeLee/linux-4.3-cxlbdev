@@ -760,6 +760,69 @@ void cxlbdev_remove_bdevs(struct cxlbdev_cfg *cxlbdev_cfg){
 	}
 }
 
+void cxlbdev_remove(struct cxlflash_cfg *cfg){
+	switch (cfg->init_state) {
+	case INIT_STATE_CXLBDEV_BDEV:
+		cxlbdev_remove_bdevs(cfg->cxlbdev_cfg);
+	case INIT_STATE_CXLBDEV_AFU:
+		cxlbdev_stop_afu_per_cpu(cfg->cxlbdev_cfg);
+	case INIT_STATE_CXLBDEV_CTX:
+		cxlbdev_term_ctx_per_cpu(cfg->cxlbdev_cfg);
+	case INIT_STATE_CXLBDEV_ALLOC:
+		cxlbdev_free_mem(cfg);
+	default:
+		break;
+	}
+	cfg->init_state = INIT_STATE_SCSI;
+
+	return;
+}
+
+int cxlbdev_pci_slot_reset(struct cxlflash_cfg *cfg){
+	int rc = 0;
+
+	rc = cxlbdev_init_ctx(cfg);
+	if(rc) goto err;
+
+	rc = cxlbdev_start_cxlbdev_afu(cfg);
+	if(rc){
+		cxlbdev_term_ctx_per_cpu(cfg->cxlbdev_cfg);
+		goto err;
+	}
+
+out:
+	return rc;
+err:
+	cxlbdev_remove_bdevs(cfg->cxlbdev_cfg);
+	cfg->init_state = INIT_STATE_SCSI;
+	goto out;
+}
+
+int cxlbdev_afu_reset(struct cxlflash_cfg *cfg){
+	int rc = 0;
+
+	cxlbdev_stop_afu_per_cpu(cfg->cxlbdev_cfg);
+	cxlbdev_term_ctx_per_cpu(cfg->cxlbdev_cfg);
+
+	rc = cxlbdev_init_ctx(cfg);
+	if(rc) goto err;
+
+	rc = cxlbdev_start_cxlbdev_afu(cfg);
+	if(rc){
+		cxlbdev_term_ctx_per_cpu(cfg->cxlbdev_cfg);
+		goto err;
+	}
+
+out:
+	return rc;
+err:
+	cxlbdev_remove_bdevs(cfg->cxlbdev_cfg);
+	cfg->init_state = INIT_STATE_SCSI;
+	goto out;
+}
+
+
+
 static void do_cxlbdev_init_bdev(void *data, async_cookie_t c){
 	struct cxlflash_cfg *cfg = (struct cxlflash_cfg *)data;
 	int rc;
