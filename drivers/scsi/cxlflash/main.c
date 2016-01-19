@@ -3,6 +3,7 @@
  *
  * Written by: Manoj N. Kumar <manoj@linux.vnet.ibm.com>, IBM Corporation
  *             Matthew R. Ochs <mrochs@linux.vnet.ibm.com>, IBM Corporation
+ *			   Youngjae Lee <leeyo@linux.vnet.ibm.com>, IBM Corporation
  *
  * Copyright (C) 2015 IBM Corporation
  *
@@ -32,6 +33,7 @@
 MODULE_DESCRIPTION(CXLFLASH_ADAPTER_NAME);
 MODULE_AUTHOR("Manoj N. Kumar <manoj@linux.vnet.ibm.com>");
 MODULE_AUTHOR("Matthew R. Ochs <mrochs@linux.vnet.ibm.com>");
+MODULE_AUTHOR("Youngjae Lee <leeyo@linux.vnet.ibm.com>");
 MODULE_LICENSE("GPL");
 
 extern int cxlbdev_afu_reset(struct cxlflash_cfg *);
@@ -44,6 +46,9 @@ extern void cxlbdev_stop_afu_per_cpu(struct cxlbdev_cfg *);
 extern void cxlbdev_term_ctx_per_cpu(struct cxlbdev_cfg *);
 extern void cxlbdev_free_mem(struct cxlflash_cfg *);
 extern int cxlbdev_init(struct cxlflash_cfg *);
+
+int num_capi_card = MAX_CAPI_CARD;
+module_param_named(n_capi_card, num_capi_card, int, S_IWUSR | S_IRUGO);
 
 /**
  * cxlflash_cmd_checkout() - checks out an AFU command

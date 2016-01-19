@@ -1,3 +1,18 @@
+/*
+ * CXL Flash Device Driver
+ *
+ * Written by: Manoj N. Kumar <manoj@linux.vnet.ibm.com>, IBM Corporation
+ *             Matthew R. Ochs <mrochs@linux.vnet.ibm.com>, IBM Corporation
+ *			   Youngjae Lee <leeyo@linux.vnet.ibm.com>, IBM Corporation
+ *
+ * Copyright (C) 2015 IBM Corporation
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License, or (at your option) any later version.
+ */
+
 #include <asm/unaligned.h>
 #include <linux/blkdev.h>
 #include <scsi/scsi_cmnd.h>
@@ -146,6 +161,8 @@ static int cxlbdev_build_cdb(struct request *req, u8 *cdb, sector_t offset, unsi
 	return 0;
 }
 
+extern int num_capi_card;
+
 // hctx->driver_data = cxlbdev_queue;
 static int cxlbdev_queue_rq(struct blk_mq_hw_ctx *hctx, const struct blk_mq_queue_data *bd){
 	struct cxlbdev_cmd *cxlbdev_cmd = NULL;
@@ -168,9 +185,9 @@ static int cxlbdev_queue_rq(struct blk_mq_hw_ctx *hctx, const struct blk_mq_queu
 	cxlbdev_queue = (struct cxlbdev_queue *)hctx->driver_data;
 
 	while(1){
-		cxlbdev_cfg = cxlbdev->cxlbdev_cfg[cxlbdev->cfg_idx++ % MAX_CAPI_CARD];
+		cxlbdev_cfg = cxlbdev->cxlbdev_cfg[cxlbdev->cfg_idx++ % num_capi_card];
 		if(cxlbdev_cfg == NULL)
-			cxlbdev_cfg = cxlbdev->cxlbdev_cfg[cxlbdev->cfg_idx++ % MAX_CAPI_CARD];
+			cxlbdev_cfg = cxlbdev->cxlbdev_cfg[cxlbdev->cfg_idx++ % num_capi_card];
 		else break;
 	}
 
@@ -562,6 +579,8 @@ int add_bdev(struct cxlbdev_cfg *cxlbdev_cfg, struct cxlbdev *cxlbdev){
 	disk->queue = cxlbdev->request_queue;
 	sprintf(disk->disk_name, "cxlbdev%d", cxlbdev->index);
 	add_disk(disk);
+
+	pr_info("/dev/cxlbdev%d created. (%llx%llx)\n", cxlbdev->index, cxlbdev->vuiU, cxlbdev->vuiL);
 
 	return 0;
 

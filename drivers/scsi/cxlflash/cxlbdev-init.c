@@ -1,3 +1,18 @@
+/*
+ * CXL Flash Device Driver
+ *
+ * Written by: Manoj N. Kumar <manoj@linux.vnet.ibm.com>, IBM Corporation
+ *             Matthew R. Ochs <mrochs@linux.vnet.ibm.com>, IBM Corporation
+ *			   Youngjae Lee <leeyo@linux.vnet.ibm.com>, IBM Corporation
+ *
+ * Copyright (C) 2015 IBM Corporation
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version
+ * 2 of the License, or (at your option) any later version.
+ */
+
 #include <asm/unaligned.h>
 #include <linux/delay.h>
 #include <linux/list.h>
@@ -57,7 +72,7 @@ int cxlbdev_alloc_mem(struct cxlflash_cfg *cfg){
 	cxlbdev_submit_queues = nr_cpu_ids;
 	if(cxlbdev_submit_queues > MAX_HW_QUEUES) cxlbdev_submit_queues = MAX_HW_QUEUES;
 
-	printk("cxlbdev_submit_queues: %d\n", cxlbdev_submit_queues);
+	pr_debug("cxlbdev_submit_queues: %d\n", cxlbdev_submit_queues);
 
 	cxlbdev_cfg = kzalloc(sizeof(struct cxlbdev_cfg), GFP_KERNEL);
 	if(unlikely(cxlbdev_cfg == NULL)){
@@ -527,7 +542,7 @@ retry:
 
 				ioasa = &(cmd->sa);
 
-				printk("%s: cmd failed afu_rc=%d scsi_rc=%d fc_rc=%d "
+				pr_err("%s: cmd failed afu_rc=%d scsi_rc=%d fc_rc=%d "
 				 "afu_extra=0x%X, scsi_extra=0x%X, fc_extra=0x%X\n",
 				 __func__, ioasa->rc.afu_rc, ioasa->rc.scsi_rc,
 				 ioasa->rc.fc_rc, ioasa->afu_extra, ioasa->scsi_extra,
@@ -542,7 +557,9 @@ retry:
 		cxlbdev_cfg->blk_len[idx] = be32_to_cpu(*((__be32 *)&cmd_buf[8]));
 		cxlbdev_cfg->lun_id[idx] = lun_to_lunid(sdev->lun);
 		cxlbdev_cfg->port_sel[idx] = sdev->channel + 1;
-		printk("read_cap16 [%d] %llu %u %u\n", idx, cxlbdev_cfg->max_lba[idx], cxlbdev_cfg->blk_len[idx], cxlbdev_cfg->port_sel[idx]);
+		pr_debug("%s: read_cap16 [%d] %llu %u %u\n",
+				__func__, idx, cxlbdev_cfg->max_lba[idx],
+				cxlbdev_cfg->blk_len[idx], cxlbdev_cfg->port_sel[idx]);
 
 		retry_cnt = 0;
 retry1:
@@ -588,7 +605,7 @@ retry1:
 
 				ioasa = &(cmd->sa);
 
-				printk("%s: cmd failed afu_rc=%d scsi_rc=%d fc_rc=%d "
+				pr_err("%s: cmd failed afu_rc=%d scsi_rc=%d fc_rc=%d "
 				 "afu_extra=0x%X, scsi_extra=0x%X, fc_extra=0x%X\n",
 				 __func__, ioasa->rc.afu_rc, ioasa->rc.scsi_rc,
 				 ioasa->rc.fc_rc, ioasa->afu_extra, ioasa->scsi_extra,
@@ -613,7 +630,8 @@ retry1:
 			if(offset >= (3 + be16_to_cpu(*((__be16 *)&cmd_buf[2])))) break;
 		}
 
-		printk("read_cap16 [%d] %llx%llx\n", idx, cxlbdev_cfg->vuiU[idx], cxlbdev_cfg->vuiL[idx]);
+		pr_debug("%s: read_cap16 [%d] %llx%llx\n",
+				__func__, idx, cxlbdev_cfg->vuiU[idx], cxlbdev_cfg->vuiL[idx]);
 next:
 		cxlflash_cmd_checkin(cmd);
 
@@ -690,7 +708,9 @@ int cxlbdev_init_bdev(struct cxlflash_cfg *cfg){
 				} else {
 					cxlbdev->port_sel[cfg_idx] |= cxlbdev_cfg->port_sel[i];
 				}
-				printk("add_cfg[%d] %llx%llx %u\n", cfg_idx, cxlbdev_cfg->vuiU[i], cxlbdev_cfg->vuiL[i], cxlbdev->port_sel[cfg_idx]);
+				pr_debug("%s: add_cfg[%d] %llx%llx %u\n",
+						__func__, cfg_idx, cxlbdev_cfg->vuiU[i], cxlbdev_cfg->vuiL[i],
+						cxlbdev->port_sel[cfg_idx]);
 				found = true;
 				break;
 			}
@@ -719,7 +739,9 @@ int cxlbdev_init_bdev(struct cxlflash_cfg *cfg){
 		cxlbdev->cxlbdev_cfg[cfg_idx] = cxlbdev_cfg;
 		list_add(&cxlbdev->list[cfg_idx], &cxlbdev_cfg->cxlbdev_list_head);
 		list_add(&cxlbdev->g_list, &g_cxlbdev_list_head);
-		printk("create_bdev[%d] %llx%llx %u\n", cfg_idx, cxlbdev_cfg->vuiU[i], cxlbdev_cfg->vuiL[i], cxlbdev->port_sel[cfg_idx]);
+		pr_debug("%s: create_bdev[%d] %llx%llx %u\n",
+				__func__, cfg_idx, cxlbdev_cfg->vuiU[i], cxlbdev_cfg->vuiL[i],
+				cxlbdev->port_sel[cfg_idx]);
 		spin_unlock_irqrestore(&lock_for_cxlbdev_major, flags);
 
 		rc = add_bdev(cxlbdev_cfg, cxlbdev);
@@ -733,7 +755,6 @@ int cxlbdev_init_bdev(struct cxlflash_cfg *cfg){
 
 			goto out;
 		}
-
 	}
 out:
 	pr_debug("%s: returning rc=%d\n", __func__, rc);
