@@ -6,4 +6,4 @@ With the new cxlflash, we can access volumes via block device files named /dev/c
 
 The cxlbdev is based on blk-mq so supports a number of request-queues same as the number of CPUs, while the previous cxlflash based on scsi-mod supports only a single request-queue that can be a major performance bottleneck.
 
-The cxlbdev shows 2X~ IOPs than the previous cxlflash with fewer threads. (4KB requests).
+On /dev/cxlbdevX, we can install any file system and it shows 2X~ IOPs than the previous cxlflash with fewer threads. (4KB requests).
